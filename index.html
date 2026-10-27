@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Portfolio of Mohammad Adil, electrical engineering student at Qatar University: every project is a part on a rendered circuit board, opening into a logbook.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Mohammad Adil, electrical engineering">
+<meta property="og:description" content="Portfolio of Mohammad Adil, electrical engineering student at Qatar University: every project is a part on a rendered circuit board, opening into a logbook.">
+<meta property="og:url" content="https://eng-adil.github.io/">
+<meta property="og:image" content="https://eng-adil.github.io/assets/pcb_real.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='7' y='7' width='18' height='18' rx='2' fill='%23161614' stroke='%23ffcf73' stroke-width='2'/%3E%3Cpath d='M11 7V2M16 7V2M21 7V2M11 30v-5M16 30v-5M21 30v-5M2 11h5M2 16h5M2 21h5M30 11h-5M30 16h-5M30 21h-5' stroke='%23ffcf73' stroke-width='2'/%3E%3C/svg%3E">
+<title>Adil's Workbench</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=UnifrakturMaguntia&display=swap">
+<style>
+/* Layout: a dark bench holding a rendered PCB; clicking a part pushes in, the copper turns to ink, and a bound logbook opens. */
+:root{
+  --bench:#161614; --silk:#eef0ea; --silk-dim:#a1a8a2; --copper:#ffcf73;
+  --parch:#ecdfc0; --ink:#33251a; --ink-soft:#6b5236; --rubric:#952a1b; --rule:#b39a70; --wash:rgba(255,250,235,.35);
+  --f-tech:"Chakra Petch",ui-sans-serif,system-ui,sans-serif;
+  --f-book:"IM Fell English",Georgia,"Times New Roman",serif;
+  --f-sc:"IM Fell English SC","IM Fell English",Georgia,serif;
+  --f-black:"UnifrakturMaguntia","IM Fell English",Georgia,serif;
+  --f-code:ui-monospace,"Cascadia Mono",Consolas,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--bench);color:var(--silk);font-family:var(--f-tech);overflow-x:hidden}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+table{color:inherit;font:inherit}
+:focus-visible{outline:2px solid var(--copper);outline-offset:3px}
+
+/* ---------- board ---------- */
+#board{min-height:100%;display:flex;flex-direction:column;padding-block:20px 28px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));transition:opacity .45s}
+.topbar{display:flex;justify-content:space-between;align-items:baseline;gap:8px 16px;flex-wrap:wrap;max-width:1280px;width:100%;margin:0 auto 14px}
+.topbar h1{font-size:clamp(20px,2.6vw,28px);font-weight:600;letter-spacing:.01em;margin:0}
+.topbar p{margin:0;color:var(--silk-dim);font-size:14px}
+.viewport{position:relative;max-width:1280px;width:100%;margin:0 auto;aspect-ratio:16/10;overflow:hidden;border-radius:6px;background:#111}
+.zoomer{position:absolute;inset:0;transform-origin:50% 50%;will-change:transform}
+.zoomer img{position:absolute;inset:0;width:100%;height:100%;display:block;user-select:none;-webkit-user-drag:none}
+#ink{-webkit-mask-image:radial-gradient(circle at var(--mx,50%) var(--my,50%),#000 var(--mr,0%),transparent calc(var(--mr,0%) + 6%));mask-image:radial-gradient(circle at var(--mx,50%) var(--my,50%),#000 var(--mr,0%),transparent calc(var(--mr,0%) + 6%))}
+.traces{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.traces polyline{fill:none;stroke:var(--copper);stroke-width:3px;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round;opacity:0;stroke-dasharray:8 6;transition:opacity .18s}
+.traces g.on polyline{opacity:1;animation:flow .45s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-14}}
+.hot{position:absolute;border-radius:5px;transition:box-shadow .18s,background .18s}
+.hot:hover,.hot:focus-visible,.hot.on{background:rgba(255,207,115,.08);box-shadow:inset 0 0 0 1.5px rgba(255,207,115,.8)}
+.tip{position:absolute;z-index:3;pointer-events:none;background:rgba(12,12,11,.94);border:1px solid rgba(255,207,115,.5);border-radius:6px;padding:9px 12px;width:max-content;max-width:260px;opacity:0;transform:translateY(4px);transition:opacity .15s,transform .15s}
+.tip.on{opacity:1;transform:none}
+.tip b{display:block;font-weight:600;font-size:15px}
+.tip span{display:block;color:var(--silk-dim);font-size:13px;line-height:1.4;margin-top:3px}
+.tip em{display:block;font-style:normal;color:var(--copper);font-size:12px;margin-top:6px}
+.hint{max-width:1280px;width:100%;margin:12px auto 0;color:var(--silk-dim);font-size:13px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.bom{max-width:1280px;width:100%;margin:22px auto 0}
+.bom h2{font-size:15px;font-weight:500;color:var(--silk-dim);margin:0 0 6px}
+.bom-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));border-top:1px solid #34322d}
+.bom button{display:grid;grid-template-columns:58px 1fr;gap:2px 10px;width:100%;text-align:left;padding:10px 4px;border-bottom:1px solid #34322d}
+.bom button:hover{background:#1f1e1b}
+.bom .ref{color:var(--copper);font-weight:600;grid-row:span 2}
+.bom .nm{font-weight:500}
+.bom .val{color:var(--silk-dim);font-size:13px}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);background:#0f100e;border:1px solid var(--copper);color:var(--silk);padding:10px 16px;border-radius:6px;font-size:14px;opacity:0;transition:.25s;z-index:20;max-width:calc(100% - 32px)}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* ---------- book ---------- */
+#book{position:fixed;inset:0;z-index:10;overflow-y:auto;background-color:var(--parch);color:var(--ink);font-family:var(--f-book);color-scheme:light;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .25 0 0 0 0 .12 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity:0;transition:opacity .55s ease}
+#book.on{opacity:1}
+#book .inner{max-width:1120px;margin:0 auto;display:grid;grid-template-columns:210px minmax(0,1fr);gap:40px;padding-block:28px 80px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.rail{position:sticky;top:calc(24px + env(safe-area-inset-top,0px));align-self:start;font-size:15px}
+.back{font-family:var(--f-book);font-style:italic;color:var(--rubric);font-size:16px;padding:0;margin-bottom:22px;display:inline-block}
+.back:hover{text-decoration:underline}
+.rail h2{font-family:var(--f-sc);font-weight:400;font-size:17px;margin:0 0 8px;border-bottom:1px solid var(--rule);padding-bottom:6px}
+.rail ol{list-style:none;margin:0;padding:0}
+.rail a{display:grid;grid-template-columns:34px 1fr;gap:4px;padding:5px 0;color:var(--ink-soft);text-decoration:none;line-height:1.3}
+.rail a .n{font-family:var(--f-sc);color:var(--rule)}
+.rail a.on{color:var(--ink)}
+.rail a.on .n{color:var(--rubric)}
+.folio{display:grid;grid-template-columns:minmax(0,1fr) 170px;gap:28px;padding:34px 0 40px;border-bottom:1px solid var(--rule);scroll-margin-top:16px}
+.fhead{grid-column:1/-1;display:flex;justify-content:space-between;align-items:baseline;gap:6px 16px;flex-wrap:wrap;border-bottom:1px solid var(--ink-soft);padding-bottom:6px}
+.fhead h3{font-family:var(--f-sc);font-weight:400;font-size:clamp(21px,2.4vw,26px);margin:0;text-wrap:balance}
+.fhead span{font-style:italic;color:var(--ink-soft);font-size:15px}
+.body{font-size:18.5px;line-height:1.62;max-width:64ch;min-width:0}
+.body p{margin:0 0 14px}
+.body .drop::first-letter{font-family:var(--f-black);color:var(--rubric);float:left;font-size:64px;line-height:.82;margin:6px 10px 0 0}
+.rub{color:var(--rubric)}
+.margin{font-style:italic;font-size:15px;color:var(--ink-soft);line-height:1.4;border-left:1px solid var(--rule);padding-left:14px;display:flex;flex-direction:column;gap:14px}
+.margin .k{font-style:normal;color:var(--rubric);margin-right:4px}
+figure{margin:18px 0;padding:0}
+figure svg{width:100%;height:auto;display:block}
+figcaption{font-style:italic;font-size:15px;color:var(--ink-soft);margin-top:6px}
+.plate{border:1px solid var(--ink-soft);padding:6px;background:var(--wash)}
+.plate img,.plate video{display:block;width:100%;height:auto}
+.plate img.screen{filter:sepia(.15) contrast(.97)}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.pair figure{margin:6px 0}
+.photo{aspect-ratio:4/3;border:1.5px dashed var(--rule);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;padding:16px;color:var(--ink-soft);font-style:italic;font-size:16px;background:var(--wash)}
+.photo b{font-family:var(--f-sc);font-style:normal;font-weight:400;color:var(--ink);font-size:17px}
+table.spec{width:100%;border-collapse:collapse;font-size:17px;margin:6px 0 16px;font-variant-numeric:tabular-nums}
+table.spec th{font-family:var(--f-sc);font-weight:400;text-align:left;color:var(--ink-soft);padding:6px 12px 6px 0;width:40%;vertical-align:top}
+table.spec td{padding:6px 0;vertical-align:top}
+table.spec tr{border-bottom:1px solid rgba(179,154,112,.6)}
+.title{grid-column:1/-1}
+.title .pn{font-family:var(--f-sc);color:var(--rubric);font-size:17px}
+.title h1{font-family:var(--f-black);font-weight:400;font-size:clamp(42px,6.5vw,72px);line-height:1.05;margin:6px 0 6px;color:var(--ink);text-wrap:balance}
+.title p{font-size:21px;font-style:italic;margin:0;color:var(--ink-soft)}
+.status{display:inline-block;font-size:14px;font-style:italic;border:1px solid var(--rubric);color:var(--rubric);padding:2px 8px;margin-top:12px}
+.ornament{text-align:center;color:var(--rule);font-size:22px;padding:20px 0 0}
+pre.code{font-family:var(--f-code);font-size:13.5px;line-height:1.5;background:var(--wash);border:1px solid var(--rule);padding:12px 14px;overflow-x:auto;color:var(--ink);margin:14px 0}
+.ctl{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.ctl button{font-family:var(--f-sc);font-size:16px;border:1px solid var(--ink-soft);padding:4px 14px;background:var(--wash);color:var(--ink)}
+.ctl button:hover{background:rgba(255,250,235,.7)}
+.ctl button[aria-pressed="true"]{background:var(--ink);color:var(--parch)}
+.note{font-size:14px;font-style:italic;color:var(--ink-soft)}
+.game{position:relative;aspect-ratio:16/9;background:#0b0a09;border:1px solid var(--ink-soft);display:flex;align-items:center;justify-content:center}
+.game iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.game .start{display:flex;flex-direction:column;align-items:center;gap:8px;color:#e9dcc0;font-family:var(--f-book);font-size:16px;text-align:center;padding:16px}
+.game .start b{font-family:var(--f-black);font-weight:400;font-size:clamp(34px,5vw,52px);color:#c8452f}
+.game .start button{font-family:var(--f-sc);font-size:18px;color:#e9dcc0;border:1px solid #c8452f;padding:6px 20px;background:rgba(200,69,47,.12)}
+.game .start button:hover{background:rgba(200,69,47,.3)}
+.model{display:block;width:100%;height:clamp(420px,70vh,640px);border:0;background:#eef1f4}
+.body a{color:var(--rubric)}
+.refs{font-size:16px;line-height:1.5;padding-left:1.2em;margin:8px 0 14px}
+.refs li{margin-bottom:8px}
+
+/* CPU emulator */
+.emu{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:14px;border:1px solid var(--ink-soft);padding:12px;background:var(--wash);font-variant-numeric:tabular-nums}
+.emu>div{min-width:0}
+.emu>div:first-child{overflow-x:auto}
+.emu table{border-collapse:collapse;width:100%;font-size:14.5px}
+.emu td{padding:2px 6px;border-bottom:1px solid rgba(179,154,112,.5);white-space:nowrap}
+.emu td.bin{font-family:var(--f-code);font-size:12.5px;color:var(--ink-soft)}
+.emu tr.pc td{background:rgba(149,42,27,.14)}
+.emu tr.pc td:first-child{color:var(--rubric)}
+.regs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.reg{border:1px solid var(--ink-soft);padding:4px 6px;text-align:center}
+.reg small{display:block;font-family:var(--f-sc);color:var(--ink-soft);font-size:13px}
+.reg b{font-weight:400;font-size:20px}
+.reg.hit{background:rgba(149,42,27,.16)}
+.tape{margin-top:8px;font-size:15px;min-height:2.6em;word-break:break-word}
+@media (max-width:700px){.emu{grid-template-columns:1fr}}
+
+@keyframes dash{to{stroke-dashoffset:-20}}
+.flowpath{stroke-dasharray:6 8;animation:dash .6s linear infinite}
+@keyframes scroll{to{transform:translateX(-50%)}}
+.scroller{animation:scroll 4s linear infinite}
+
+@media (max-width:860px){
+  #book .inner{grid-template-columns:minmax(0,1fr);gap:0}
+  .rail{position:sticky;top:0;z-index:2;background:var(--parch);margin:0 calc(-1 * max(16px,env(safe-area-inset-left,0px)));padding:10px max(16px,env(safe-area-inset-left,0px)) 8px;border-bottom:1px solid var(--rule)}
+  .rail h2{display:none}
+  .back{margin-bottom:6px}
+  .rail ol{display:flex;gap:18px;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+  .rail a{display:flex;gap:6px;padding:2px 0}
+  .folio{grid-template-columns:minmax(0,1fr);gap:16px;scroll-margin-top:84px}
+  .margin{border-left:0;border-top:1px solid var(--rule);padding:12px 0 0}
+  .body{font-size:17.5px}
+  .pair{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){.traces g.on polyline,.flowpath,.scroller{animation:none}.zoomer,#book{transition:none!important}}
+</style>
+<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+
+
+<main id="board">
+  <div class="topbar">
+    <h1>Mohammad Adil, electrical engineering</h1>
+    <p>Every part on this board is one of my projects, wired to the bus it really uses.</p>
+  </div>
+  <div class="viewport" id="viewport">
+    <div class="zoomer" id="zoomer">
+      <img id="real" src="assets/pcb_real.jpg" alt="A rendered black circuit board. An ESP32 module in the centre is wired to a chip labelled 8-bit CPU, a tiny steering wheel and pedal on two potentiometers, a microphone, an optical sensor, a 3D printed dust sensor, a motor with a wheel, a syringe beside a stepper driver, a seedling in a pot, a chip engraved Moribund beside a lit candle, a seven-segment display reading 15, a microSD card labelled CV and a plugged-in USB-C cable.">
+      <img id="ink" src="assets/pcb_ink.jpg" alt="" aria-hidden="true">
+      <svg class="traces" id="traces" viewBox="0 0 1 1" preserveAspectRatio="none" aria-hidden="true"></svg>
+    </div>
+    <div id="hots"></div>
+    <div class="tip" id="tip" role="status"><b></b><span></span><em></em></div>
+  </div>
+  <div class="hint"><span>Hover a part to light its traces. Click it to open its logbook.</span><span>Board modelled and rendered in Blender, rev B</span></div>
+  <nav class="bom" aria-label="Bill of materials">
+    <h2>Bill of materials</h2>
+    <div class="bom-list" id="bom"></div>
+  </nav>
+</main>
+
+<section id="book" hidden></section>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* One entry per part on the board. Boxes and traces come from assets/board.json, written by board/build_board.py. */
+const PARTS=[
+ {id:'about',ref:'U1',name:'About me',val:'The ESP32 everything else hangs off. Education, awards, skills and interests.',act:'Open',book:'about'},
+ {id:'dustmap',ref:'J4, U10',name:'DustMap',val:'A particle sensor in its 3D printed shell, on UART. Dust inspection for Qatar’s Ministry of Environment.',act:'Open the logbook',book:'dustmap'},
+ {id:'wheel',ref:'RV1, RV2',name:'Sim wheel and pedal',val:'A tiny wheel and pedal on two potentiometers. The real ones are 3D printed and geared.',act:'Open the logbook',book:'wheel'},
+ {id:'chemecar',ref:'U4, M1',name:'AIChE ChemE Car',val:'An H-bridge driving a motor and wheel. Motor control and dynamic braking.',act:'Open the logbook',book:'chemecar'},
+ {id:'cpu',ref:'U2',name:'8-bit computer',val:'The Overture-8, on an 8-bit data bus. Designed from NAND gates up.',act:'Open the logbook',book:'cpu'},
+ {id:'sensebridge',ref:'MK1',name:'Sensebridge',val:'A microphone and preamp. Speech-sound recognition for therapy. Award winner.',act:'Open the logbook',book:'sensebridge'},
+ {id:'glucose',ref:'U5',name:'Glucose monitoring',val:'An optical PPG sensor on I²C. Non-invasive blood glucose research.',act:'Open the logbook',book:'glucose'},
+ {id:'corrosion',ref:'TP2',name:'Corrosion-sensing coatings',val:'A real patch of corroding copper. Coatings that report and slow corrosion.',act:'Open the logbook',book:'corrosion'},
+ {id:'syringe',ref:'U8, J6',name:'Syringe rotation device',val:'A stepper driver and the syringe it turns. Keeps lab samples mixed.',act:'Open the logbook',book:'syringe'},
+ {id:'irrigation',ref:'J7, Q1',name:'Smart irrigation',val:'A servo valve, a temperature sensor and a seedling. Closed-loop watering.',act:'Open the logbook',book:'irrigation'},
+ {id:'fpga',ref:'DS1',name:'FPGA multiplier',val:'A display showing 3 × 5 = 15. VHDL on a DE10-Lite board.',act:'Open the logbook',book:'fpga'},
+ {id:'moribund',ref:'U6',name:'Moribund',val:'A chip engraved Moribund, by candlelight. A solo action RPG in Godot.',act:'Open the logbook',book:'moribund'},
+ {id:'cv',ref:'J8',name:'CV',val:'A microSD card labelled CV, on its own SPI bus.',act:'Download on the real site',action:'cv'},
+ {id:'contact',ref:'J1',name:'Contact',val:'USB-C with a cable plugged in: where the outside world connects.',act:'Open',book:'contact'},
+ {id:'status',ref:'D1',name:'Open to work',val:'Status LED: lit. Looking for internships and research roles.',act:'',action:'status'},
+];
+
+const $=s=>document.querySelector(s);
+const hots=$('#hots'),tip=$('#tip'),svg=$('#traces'),zoomer=$('#zoomer'),ink=$('#ink'),board=$('#board'),book=$('#book');
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+let DATA=null,current=null,busy=false,cleanup=[];
+
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('on');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('on'),2800)}
+
+function build(){
+  PARTS.forEach(p=>{
+    const d=DATA.parts[p.id]; if(!d) return;
+    const [x0,y0,x1,y1]=d.box.map(v=>Math.min(1,Math.max(0,v))); p.box=[x0,y0,x1,y1];
+    const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+    d.traces.forEach(t=>{const pl=document.createElementNS('http://www.w3.org/2000/svg','polyline');pl.setAttribute('points',t.map(q=>q.join(',')).join(' '));g.appendChild(pl)});
+    svg.appendChild(g);p.g=g;
+    const b=document.createElement('button');
+    b.className='hot';b.style.cssText=`left:${x0*100}%;top:${y0*100}%;width:${(x1-x0)*100}%;height:${(y1-y0)*100}%`;
+    b.setAttribute('aria-label',`${p.ref}, ${p.name}`);
+    const on=()=>{g.classList.add('on');showTip(p)},off=()=>{g.classList.remove('on');tip.classList.remove('on')};
+    b.addEventListener('mouseenter',on);b.addEventListener('focus',on);b.addEventListener('mouseleave',off);b.addEventListener('blur',off);
+    b.addEventListener('click',()=>activate(p));
+    hots.appendChild(b);p.btn=b;
+    const r=document.createElement('button');
+    r.innerHTML=`<span class="ref">${p.ref}</span><span class="nm">${p.name}</span><span class="val">${p.val}</span>`;
+    r.addEventListener('click',()=>activate(p));
+    r.addEventListener('mouseenter',()=>{g.classList.add('on');b.classList.add('on')});
+    r.addEventListener('mouseleave',()=>{g.classList.remove('on');b.classList.remove('on')});
+    $('#bom').appendChild(r);
+  });
+  const start=PARTS.find(p=>p.book&&'#'+p.book===location.hash);
+  if(start) openBook(start,true);
+}
+function showTip(p){
+  const [x0,y0,x1]=p.box;
+  tip.querySelector('b').textContent=`${p.ref}  ${p.name}`;
+  tip.querySelector('span').textContent=p.val;
+  tip.querySelector('em').textContent=p.act;
+  const right=(x0+x1)/2>.55;
+  tip.style.left=right?'':`${x1*100+1}%`;tip.style.right=right?`${100-x0*100+1}%`:'';
+  tip.style.top=`${Math.min(y0*100,70)}%`;
+  tip.classList.add('on');
+}
+function activate(p){
+  if(p.book) return openBook(p);
+  if(p.action==='cv'){
+    if(/github\.io$/.test(location.hostname)){const a=document.createElement('a');a.href='cv/Mohammad_Adil_CV.pdf';a.target='_blank';a.rel='noopener';a.click();return}
+    return toast('The CV PDF opens from here on the published site.');
+  }
+  if(p.action==='status') return toast('Open to internships, research positions and graduate roles.');
+}
+
+/* ---------- transition ---------- */
+function animate(dur,fn){return new Promise(res=>{const t0=performance.now();(function f(t){const k=Math.min(1,(t-t0)/dur);fn(k);k<1?requestAnimationFrame(f):res()})(t0)})}
+const ease=k=>k<.5?4*k*k*k:1-Math.pow(-2*k+2,3)/2;
+async function openBook(p,instant){
+  if(busy)return;busy=true;current=p;
+  const [x0,y0,x1,y1]=p.box,cx=(x0+x1)*50,cy=(y0+y1)*50;
+  const zoom=Math.min(3.2,Math.max(1.8,.32/Math.max(x1-x0,y1-y0)));
+  zoomer.style.transformOrigin=`${cx}% ${cy}%`;
+  ink.style.setProperty('--mx',cx+'%');ink.style.setProperty('--my',cy+'%');
+  p.g.classList.add('on');tip.classList.remove('on');
+  renderBook(p);
+  if(!(reduce||instant)){
+    await animate(1150,k=>{const e=ease(k);zoomer.style.transform=`scale(${1+e*(zoom-1)})`;const ik=Math.max(0,(k-.35)/.65);ink.style.setProperty('--mr',(ik*ik*120)+'%')});
+  }
+  p.zoom=zoom;
+  ink.style.setProperty('--mr','140%');
+  book.hidden=false;requestAnimationFrame(()=>book.classList.add('on'));
+  board.style.opacity=0;book.scrollTop=0;
+  setTimeout(()=>{busy=false;book.querySelector('.back').focus({preventScroll:true})},reduce?0:560);
+  try{history.replaceState(null,'','#'+p.book)}catch(e){}
+}
+async function closeBook(){
+  if(busy||!current)return;busy=true;
+  cleanup.forEach(f=>f());cleanup=[];
+  book.querySelectorAll('video').forEach(v=>v.pause());
+  book.classList.remove('on');board.style.opacity=1;
+  await new Promise(r=>setTimeout(r,reduce?0:450));
+  book.hidden=true;
+  const z=current.zoom||2.2;
+  if(!reduce) await animate(950,k=>{const e=ease(1-k);zoomer.style.transform=`scale(${1+e*(z-1)})`;ink.style.setProperty('--mr',(e*e*120)+'%')});
+  zoomer.style.transform='';ink.style.setProperty('--mr','0%');
+  current.g.classList.remove('on');
+  try{history.replaceState(null,'',location.pathname)}catch(e){}
+  current.btn.focus({preventScroll:true});
+  current=null;busy=false;
+}
+addEventListener('keydown',e=>{if(e.key==='Escape'&&!book.hidden)closeBook()});
+
+/* ---------- media helpers ---------- */
+const INK='#33251a',SOFT='#6b5236',RUB='#952a1b',F='font-family="IM Fell English,serif"';
+const img=(src,cap,alt,cls='')=>`<figure><div class="plate"><img class="${cls}" src="${src}" alt="${alt||cap}" loading="lazy"></div><figcaption>${cap}</figcaption></figure>`;
+const shot=(src,cap,alt)=>img(src,cap,alt,'screen');
+const vid=(src,cap,loop)=>`<figure><div class="plate"><video src="${src}" ${loop?'autoplay loop muted playsinline':'controls muted playsinline'} preload="metadata"></video></div><figcaption>${cap}</figcaption></figure>`;
+const photo=(what)=>`<figure><div class="photo"><b>Photograph to come</b>${what}</div></figure>`;
+
+/* ---------- figures ---------- */
+const FIG={
+ brakeSpeed:`<svg viewBox="0 0 520 190" role="img" aria-label="Illustrative chart of motor speed after the stop signal: coasting decays slowly, dynamic braking stops the motor several times faster"><g fill="none" stroke="${INK}" stroke-width="1.2"><path d="M60 20V160H500"/></g>
+  <path d="M60 40 C140 40 200 70 260 110 S420 155 500 158" fill="none" stroke="${SOFT}" stroke-width="2" stroke-dasharray="6 5"/>
+  <path d="M60 40 C90 40 110 120 150 155 L500 160" fill="none" stroke="${RUB}" stroke-width="2.4"/>
+  <g ${F} font-size="15" fill="${INK}"><text x="10" y="45">speed</text><text x="440" y="182">time</text><text x="300" y="98" fill="${SOFT}">coasting</text><text x="160" y="140" fill="${RUB}">braking</text><text x="64" y="182">stop signal</text></g></svg>`,
+ capsule:`<svg viewBox="0 0 520 210" role="img" aria-label="Cross-section of the coating on steel. Microspheres in the polyurethane hold an indicator and an inhibitor. A scratch reaches the steel; corrosion raises the pH, the indicator turns pink and the inhibitor is released"><g fill="none" stroke="${INK}" stroke-width="1.3">
+  <path d="M10 170H510"/><path d="M10 170V200H510V170"/><path d="M10 80H510"/>
+  <circle cx="80" cy="125" r="22"/><circle cx="170" cy="110" r="18"/><circle cx="380" cy="130" r="20"/><circle cx="460" cy="105" r="17"/>
+  <path d="M250 80 L262 170 L274 80" fill="#efe3c6"/></g>
+  <g fill="${RUB}" opacity=".55"><circle cx="300" cy="128" r="19"/></g><path d="M281 128a19 19 0 0 0 38 0" fill="none" stroke="${INK}" stroke-width="1.3" stroke-dasharray="3 3"/>
+  <g fill="${SOFT}"><circle cx="80" cy="125" r="4"/><circle cx="172" cy="110" r="4"/><circle cx="380" cy="130" r="4"/><circle cx="460" cy="105" r="4"/></g>
+  <g ${F} font-size="15" fill="${INK}"><text x="20" y="196">carbon steel</text><text x="20" y="70">polyurethane coating</text><text x="226" y="60">scratch</text><text x="330" y="60" fill="${RUB}">indicator turns pink,</text><text x="330" y="76" fill="${RUB}">inhibitor released</text><text x="40" y="160" font-size="13">CaCO₃ microsphere</text></g></svg>`,
+ syringe:`<svg viewBox="0 0 520 200" role="img" aria-label="The rotation rig: a NEMA 17 stepper drives a GT2 belt around a pulley clamped to the syringe, turning it about its own axis while the infusion pump pushes the plunger"><g fill="none" stroke="${INK}" stroke-width="1.4">
+  <rect x="30" y="110" width="70" height="70"/><circle cx="65" cy="80" r="14"/><circle cx="300" cy="80" r="26"/>
+  <path class="flowpath" d="M65 66 L300 54 M65 94 L300 106" stroke="${RUB}"/>
+  <rect x="180" y="62" width="250" height="36" rx="4"/><path d="M430 72h50v16h-50"/><path d="M150 80h30"/><path d="M110 80h40" stroke-width=".8"/></g>
+  <g ${F} font-size="15" fill="${INK}"><text x="22" y="198">NEMA 17 stepper</text><text x="200" y="130">GT2 belt and pulley clamp</text><text x="330" y="52">syringe turns on its axis</text><text x="438" y="112">to the pump</text></g>
+  <path d="M300 30 a50 18 0 1 1 -1 0" fill="none" stroke="${RUB}" stroke-width="1.3" marker-end="url(#ah)"/><defs><marker id="ah" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0 0L8 4L0 8z" fill="${RUB}"/></marker></defs></svg>`,
+ pipeline:`<svg viewBox="0 0 560 170" role="img" aria-label="Illustration of the recognition pipeline: a recorded sound becomes a spectrogram image, a convolutional network reads it, and the output is the most likely of the three sounds"><g fill="none" stroke="${INK}" stroke-width="1.3">
+  <rect x="10" y="40" width="120" height="80"/><rect x="160" y="40" width="110" height="80"/><path d="M300 45l30 10v50l-30 10zM345 55l25 8v34l-25 8zM385 65l20 6v18l-20 6z"/><rect x="430" y="40" width="120" height="80"/>
+  <path d="M135 80h20M275 80h20M410 80h15" stroke-width="1"/></g>
+  <g class="scroller"><path d="${(()=>{let d='M10 80';for(let x=0;x<=240;x+=3)d+=` L${10+x} ${80+Math.sin(x*.35)*Math.sin(x*.04)*28}`;return d})()}" fill="none" stroke="${RUB}" stroke-width="1.3"/></g>
+  <g>${(()=>{let s='';for(let i=0;i<11;i++)for(let j=0;j<8;j++){const v=Math.abs(Math.sin(i*1.7+j*.9)*Math.cos(j*.6));s+=`<rect x="${162+i*9.8}" y="${42+j*9.7}" width="9.6" height="9.5" fill="${INK}" opacity="${(v*.8).toFixed(2)}"/>`}return s})()}</g>
+  <g ${F} font-size="15" fill="${INK}"><text x="40" y="140">recording</text><text x="170" y="140">spectrogram</text><text x="300" y="140">CNN</text><text x="440" y="62">/s/</text><text x="440" y="86">/m/</text><text x="440" y="110">/p/</text></g>
+  <g fill="${RUB}"><rect x="475" y="52" width="60" height="10"/><rect x="475" y="76" width="14" height="10" opacity=".5"/><rect x="475" y="100" width="8" height="10" opacity=".5"/></g></svg>`,
+ ppgSetup:`<svg viewBox="0 0 520 170" role="img" aria-label="PPG setup: an LED shines into the fingertip, light scattered back by blood vessels reaches a photodiode; each heartbeat changes how much light comes back"><g fill="none" stroke="${INK}" stroke-width="1.4">
+  <path d="M60 40 Q260 -10 460 40 L460 120 L60 120 Z"/><path d="M120 85 q30 -15 60 0 t60 0 t60 0 t60 0 t60 0" stroke="${RUB}" stroke-width="2"/>
+  <rect x="150" y="125" width="40" height="22"/><rect x="320" y="125" width="40" height="22"/>
+  <path class="flowpath" d="M170 125 L230 90 L330 125" stroke="${RUB}"/></g>
+  <g ${F} font-size="15" fill="${INK}"><text x="140" y="165">LED</text><text x="300" y="165">photodiode</text><text x="210" y="30">fingertip</text><text x="380" y="80" fill="${RUB}">blood vessels</text></g></svg>`,
+ loop:`<svg viewBox="0 0 520 150" role="img" aria-label="Control loop: the soil-moisture sensor feeds the ESP32, which compares the reading with the threshold and opens or closes the servo valve, which waters the soil"><g fill="none" stroke="${INK}" stroke-width="1.4">
+  <rect x="20" y="50" width="110" height="46"/><rect x="200" y="50" width="120" height="46"/><rect x="390" y="50" width="110" height="46"/>
+  <path d="M130 73h70M320 73h70"/><path d="M445 96v34H75V96"/></g>
+  <g ${F} font-size="15" fill="${INK}" text-anchor="middle"><text x="75" y="78">soil sensor</text><text x="260" y="70">ESP32</text><text x="260" y="88" font-size="13">below threshold?</text><text x="445" y="78">servo valve</text><text x="260" y="145" fill="${RUB}">water raises the moisture</text></g></svg>`
+};
+
+/* ---------- interactive pieces ---------- */
+const WIDGETS={
+ /* Overture-8: instruction-accurate model of the machine, running Fibonacci until the signed result overflows */
+ cpu(root){
+  const PROG=[[0x01,'IMM 1','r0 ← 1'],[0x82,'COPY r0 r2','r2 ← r0'],[0x00,'IMM 0','r0 ← 0'],[0x81,'COPY r0 r1','r1 ← r0'],[0x44,'ADD','r3 ← r1 + r2'],[0x9E,'COPY r3 out','output r3'],[0x91,'COPY r2 r1','r1 ← r2'],[0x9A,'COPY r3 r2','r2 ← r3'],[0x04,'IMM 4','r0 ← 4'],[0xC7,'JMP if > 0','if r3 > 0, pc ← r0']];
+  root.innerHTML=`<div class="emu"><div><table>${PROG.map((p,i)=>`<tr data-i="${i}"><td>${i}</td><td class="bin">${p[0].toString(2).padStart(8,'0')}</td><td>${p[1]}</td><td class="note">${p[2]}</td></tr>`).join('')}</table></div>
+   <div><div class="regs">${[0,1,2,3,4,5].map(i=>`<div class="reg" data-r="${i}"><small>reg ${i}</small><b>0</b></div>`).join('')}</div>
+   <div class="ctl"><button type="button" data-a="step">Step</button><button type="button" data-a="run" aria-pressed="false">Run</button><button type="button" data-a="reset">Reset</button></div>
+   <div class="note">Output</div><div class="tape" aria-live="polite">–</div><div class="note st"></div></div></div>`;
+  let r,pc,out,halted,timer=null;
+  const rows=[...root.querySelectorAll('tr')],regs=[...root.querySelectorAll('.reg')],tape=root.querySelector('.tape'),st=root.querySelector('.st'),runB=root.querySelector('[data-a=run]');
+  const s8=v=>v>127?v-256:v;
+  function reset(){r=[0,0,0,0,0,0];pc=0;out=[];halted=false;stop();draw(-1)}
+  function draw(hit){rows.forEach((tr,i)=>tr.classList.toggle('pc',i===pc&&!halted));regs.forEach((d,i)=>{d.querySelector('b').textContent=r[i];d.classList.toggle('hit',i===hit)});tape.textContent=out.length?out.join(', '):'–';st.textContent=halted?'Halted: 144 overflows 8 signed bits and reads as negative, so the loop ends.':`pc = ${pc}`}
+  function step(){
+   if(halted)return;const b=PROG[pc][0],mode=b>>6;let hit=-1;
+   if(mode===0){r[0]=b&63;hit=0;pc++}
+   else if(mode===1){const op=b&7,a=r[1],c=r[2];r[3]=[a|c,~(a&c),~(a|c),a&c,a+c,a-c][op]&255;hit=3;pc++}
+   else if(mode===2){const sr=(b>>3)&7,dr=b&7,v=sr===6?0:r[sr];if(dr===6)out.push(v);else{r[dr]=v;hit=dr}pc++}
+   else{const c=b&7,v=s8(r[3]);const ok=[false,v===0,v<0,v<=0,true,v!==0,v>=0,v>0][c];pc=ok?r[0]:pc+1}
+   if(pc>=PROG.length){halted=true;stop()}
+   draw(hit);
+  }
+  function stop(){clearInterval(timer);timer=null;runB.setAttribute('aria-pressed','false');runB.textContent='Run'}
+  root.querySelector('[data-a=step]').onclick=step;
+  root.querySelector('[data-a=reset]').onclick=reset;
+  runB.onclick=()=>{if(timer){stop();return}if(halted)reset();timer=setInterval(step,reduce?60:260);runB.setAttribute('aria-pressed','true');runB.textContent='Pause'};
+  reset();return stop;
+ },
+ /* H-bridge: which switches are closed, and where current flows, in each mode */
+ hbridge(root){
+  const MODES={drive:{on:[0,3],path:'M110 30 V70 H190 M330 70 H410 V30 M410 30 H110 M330 130 H410 V170 H110 V130 H190',cap:'Driving: high-left and low-right switches closed, current flows through the motor.'},
+   coast:{on:[],path:'',cap:'Coasting: all switches open. The motor spins freely and slows only through friction.'},
+   brake:{on:[2,3],path:'M190 130 H110 V170 H410 V130 H330 M330 100 H190',cap:'Braking: both low-side switches closed. The motor is shorted, its back-EMF drives a current that resists the rotation.'}};
+  const SW=[[110,50],[410,50],[110,150],[410,150]];
+  root.innerHTML=`<figure><div class="plate"><svg viewBox="0 0 520 200" role="img" aria-label="H-bridge diagram"><g fill="none" stroke="${INK}" stroke-width="1.4"><path d="M110 15V185M410 15V185M90 15H430M90 185H430M110 100H220M300 100H410"/><circle cx="260" cy="100" r="34"/></g>
+   <g class="sw"></g><path class="cur flowpath" fill="none" stroke="${RUB}" stroke-width="3"/>
+   <g ${F} font-size="16" fill="${INK}"><text x="252" y="106">M</text><text x="440" y="20">supply</text><text x="440" y="190">ground</text></g></svg></div><figcaption class="cap"></figcaption></figure>
+   <div class="ctl" role="group" aria-label="Bridge mode">${Object.keys(MODES).map(k=>`<button type="button" data-m="${k}" aria-pressed="false">${k[0].toUpperCase()+k.slice(1)}</button>`).join('')}</div>`;
+  const swG=root.querySelector('.sw'),cur=root.querySelector('.cur'),cap=root.querySelector('.cap');
+  function set(m){const M=MODES[m];swG.innerHTML=SW.map(([x,y],i)=>M.on.includes(i)?`<path d="M${x} ${y-14}V${y+14}" stroke="${RUB}" stroke-width="3"/>`:`<path d="M${x} ${y-14}l14 22" stroke="${INK}" stroke-width="2" fill="none"/><circle cx="${x}" cy="${y+14}" r="3" fill="${INK}"/>`).join('');
+   cur.setAttribute('d',M.path);cap.textContent=M.cap;root.querySelectorAll('[data-m]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.m===m))}
+  root.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>set(b.dataset.m));set('drive');
+ },
+ /* a scrolling PPG pulse, for illustration */
+ ppg(root){
+  root.innerHTML=`<figure><div class="plate"><svg viewBox="0 0 520 140" role="img" aria-label="Animated illustration of a PPG pulse trace"><g class="scroller"><path fill="none" stroke="${RUB}" stroke-width="2" d="${(()=>{let d='';for(let x=0;x<=1040;x+=2){const ph=(x%130)/130;const v=Math.exp(-(((ph-.25)/.07)**2))*60+Math.exp(-(((ph-.47)/.08)**2))*22;d+=(x?' L':'M')+x+' '+(115-v).toFixed(1)}return d})()}"/></g><path d="M0 120H520" stroke="${SOFT}" stroke-width=".6"/></svg></div><figcaption>An illustration of the pulse a PPG sensor sees: a sharp systolic peak, then the smaller dicrotic notch.</figcaption></figure>`;
+ },
+ /* capsule: the coating in cross-section */
+ capsule(root){
+  root.innerHTML=`${'<figure><div class="plate">'+FIG.capsule+'</div><figcaption>Fig. 1. The self-reporting coating, scratched through to the steel.</figcaption></figure>'}`;
+ },
+ /* Moribund: the web demo in an iframe, loaded only on request. Pages other than github.io cannot frame it, so they link out. */
+ game(root){
+  const SRC='https://eng-adil.github.io/moribund-demo/';
+  const embeddable=/github\.io$|^localhost$|^127\./.test(location.hostname);
+  root.innerHTML=`<div class="game"><div class="start"><b>Moribund</b><span>Ashwick and the Weeping Graves</span>${embeddable?'<button type="button">Start the demo</button>':`<a href="${SRC}" style="color:#e9dcc0;font-size:18px">Play the demo</a>`}<span style="font-size:14px;opacity:.8">About 110 MB to load. Desktop browser, keyboard and mouse.</span></div></div>
+   <div class="ctl"><button type="button" data-a="full" hidden>Full screen</button><a class="note" href="${SRC}">Open in its own tab</a></div>
+   <p class="note">Click inside the game once to give it the keyboard and start the sound. Controls: left click to move and attack, right click and 1 to 6 for skills, Q and E for potions.</p>`;
+  const box=root.querySelector('.game'),full=root.querySelector('[data-a=full]');
+  const btn=box.querySelector('button');
+  if(btn) btn.onclick=()=>{
+    box.innerHTML=`<iframe src="${SRC}" title="Moribund web demo" allow="fullscreen; autoplay; gamepad" allowfullscreen></iframe>`;
+    const f=box.querySelector('iframe');f.focus();full.hidden=false;
+    full.onclick=()=>{(f.requestFullscreen||f.webkitRequestFullscreen||(()=>{})).call(f)};
+  };
+  return ()=>{box.innerHTML=''};
+ },
+ /* irrigation: moisture falls, the valve opens at the threshold, moisture recovers */
+ irrigation(root){
+  root.innerHTML=`<figure><div class="plate"><svg viewBox="0 0 520 170" role="img" aria-label="Animated illustration of the irrigation control loop: soil moisture falls until it reaches the threshold, the valve opens and moisture rises again"><path d="M40 20V150H510" fill="none" stroke="${INK}" stroke-width="1.2"/><path d="M40 105H510" stroke="${SOFT}" stroke-dasharray="6 5"/><path class="m" fill="none" stroke="${RUB}" stroke-width="2.2"/><g class="v"></g>
+   <g ${F} font-size="14" fill="${INK}"><text x="44" y="16">soil moisture</text><text x="440" y="100" fill="${SOFT}">threshold</text><text x="452" y="166">time</text></g></svg></div><figcaption>An illustration of the loop: the valve opens (shaded) whenever moisture reaches the threshold found in the growth study.</figcaption></figure>`;
+  const m=root.querySelector('.m'),vg=root.querySelector('.v');let t=0,raf;
+  function frame(){t+=reduce?0:1;let d='',open=false,shade='',s0=null;
+   let mo=0.75;const seq=[];for(let i=0;i<940;i++){if(open){mo+=0.006;if(mo>0.78)open=false}else{mo-=0.0016;if(mo<=0.36)open=true}seq.push([mo,open])}
+   const off=t%470;for(let i=0;i<235;i++){const [v,o]=seq[i*2+off];const X=40+i*2,Y=150-v*130;d+=(i?' L':'M')+X+' '+Y.toFixed(1);if(o&&s0===null)s0=X;if(!o&&s0!==null){shade+=`<rect x="${s0}" y="20" width="${X-s0}" height="130" fill="${RUB}" opacity=".08"/>`;s0=null}}
+   if(s0!==null)shade+=`<rect x="${s0}" y="20" width="${510-s0}" height="130" fill="${RUB}" opacity=".08"/>`;
+   m.setAttribute('d',d);vg.innerHTML=shade;if(!reduce)raf=requestAnimationFrame(frame)}
+  frame();return ()=>cancelAnimationFrame(raf);
+ }
+};
+
+/* ---------- logbooks ---------- */
+const BOOKS={
+ about:{pn:'U1  ABOUT',title:'Mohammad Adil',sub:'Electrical engineering student at Qatar University',
+  spec:[['Degree','BSc Electrical Engineering, 2023 to 2028 (expected)'],['GPA','3.50 / 4.00'],['Awards','Best Research Project Award, Track 3, QU Summer Research Internship 2026'],['Scholarship','Outstanding Performance Scholarship, top 50 university-wide'],['Honours',"Dean’s List and Vice President’s List"],['Languages','English, Urdu, Hindi']],
+  folios:[
+   {t:'Who I am',d:'',body:`<p class="drop">I am an electrical engineering student who prefers to build the whole system: the circuit, the firmware, the mechanical parts and the software that makes sense of the data. Most of my projects begin with a concrete problem, whether a researcher whose samples kept separating or an inspector who needs to know where dust leaves a quarry.</p><p>I try to measure before I claim. Where I can, I check my work against something established, such as a textbook equation, a fixed baseline or a controlled test, and I report the limitations alongside the results.</p>`,m:[]},
+   {t:'Beyond engineering',d:'',body:`<p class="drop">Outside engineering, I have a long-standing interest in history, particularly the medieval period: how its institutions, warfare and craftsmanship worked, and how much of it was achieved with so little. The notebooks of engineers such as Francesco di Giorgio Martini, who recorded machines and fortifications in the margins of their work, are the inspiration for the logbooks on this site.</p><p>I am also a keen player and maker of games. Designing <i>Moribund</i>, my own action RPG, brings both interests together, and it has taught me as much about systems design, rendering and testing as any coursework.</p>`,m:['The candle on the board belongs to Moribund.']},
+   {t:'Tools I work with',d:'',body:`<table class="spec"><tr><th>Embedded and hardware</th><td>ESP32, Arduino, embedded C/C++, sensor interfacing, motor control, NI ELVIS, 3D printing</td></tr><tr><th>Programming</th><td>Python (FastAPI, TensorFlow), VHDL, GDScript</td></tr><tr><th>Design and simulation</th><td>SolidWorks, OpenSCAD, Blender, MATLAB, Multisim, Digital (logic simulator), Quartus</td></tr><tr><th>Tools</th><td>Git, Microsoft Office</td></tr></table>`,m:['This board was modelled and rendered in Blender from a script.']},
+  ]},
+ contact:{pn:'J1  CONTACT',title:'Get in touch',sub:'Email is the fastest way to reach me',
+  spec:[['Email','ma2317831@qu.edu.qa'],['LinkedIn','<a href="https://www.linkedin.com/in/mohammad-adil-abdulrashid/">mohammad-adil-abdulrashid</a>'],['GitHub','<a href="https://github.com/eng-adil">eng-adil</a>'],['Based in','Doha, Qatar'],['Looking for','Internships, research positions and graduate roles']],
+  folios:[{t:'Elsewhere',d:'',body:`<p class="drop">The quickest way to reach me is by email or a message on <a href="https://www.linkedin.com/in/mohammad-adil-abdulrashid/">LinkedIn</a>. Code for my public projects, including the <a href="https://eng-adil.github.io/moribund-demo/">Moribund demo</a>, is on <a href="https://github.com/eng-adil">GitHub</a>.</p>`,m:[]}]},
+
+ dustmap:{pn:'J4, U10  DUSTMAP',title:'DustMap',sub:'Finding where dust escapes quarries, crushers and concrete plants',status:'Team project for Qatar’s Ministry of Environment and Climate Change',
+  spec:[['Hardware','Portable ESP32 units with a particulate-matter sensor in a 3D printed enclosure'],['Platform','Python, FastAPI, SQLite'],['My part','Co-designed the monitoring units; built the platform on the team’s first prototype'],['Hotspots found','71% vs 55% for a fixed route (14 readings)'],['Plume check','Within 1% (centreline) and 2% (width)']],
+  folios:[
+   {t:'Of the problem',d:'',body:`<p class="drop">Crushers, conveyors, stockpiles and haul roads release dust, and some of it escapes the site towards roads, homes and workers. An inspector needs to know where it escapes, how often, and whether the site’s dust controls, such as water sprays and covers, actually work.</p><p>Qatar’s air is often dusty everywhere, which makes the question harder: a high reading means nothing unless it is high compared with the air arriving at the site.</p>`,m:[]},
+   {t:'Of the monitoring units',d:'',body:`<p class="drop">Each unit is an ESP32 with a particulate-matter sensor, housed in a 3D printed enclosure and reporting its readings to the platform. One is carried between approved monitoring points; the other stands upwind as a reference, recording background dust every minute.</p>${shot('assets/media/dust_devices.jpg','Plate II. The devices page, where sensor units connect to the platform.')}`,m:['Readings are tied to a monitoring point, so the units work without GPS.']},
+   {t:'Of an inspection',d:'',body:`<p class="drop">An inspection starts from a site plan: the boundary, buildings, dust sources and approved monitoring points. Each reading is compared with the reference measured over the same minutes, so it shows the site’s own contribution.</p><div class="pair">${shot('assets/media/dust_editor.jpg','Plate III. Drawing a site.')}${shot('assets/media/dust_reading.jpg','Plate IV. The first reading of an inspection.')}</div>`,m:['<span class="k">Action level</span>+50 µg/m³ PM10 above background.']},
+   {t:'Of the map and the next point',d:'',body:`<p class="drop">A Gaussian process turns the readings into a dust map with an uncertainty for every location. The platform then recommends the next point to measure, weighing how high the estimate is, how uncertain it is, and how far the inspector has to walk.</p>${shot('assets/media/dust_map.jpg','Plate V. The dust map during an inspection (simulated data).')}<p>Across 12 simulated sites with 14 readings each, the recommendations found 71% of the real hotspots, against 55% for a fixed route and 50% for random points, with 91% of flags correct.</p>${shot('assets/media/dust_validation.jpg','Plate VI. The validation page.')}`,m:['The trade-off: recommended routes walk further, 3.6 km against 2.2 km.']},
+   {t:'Of the simulator',d:'',body:`<p class="drop">Before the sensors arrived, the platform needed realistic data. I wrote a 2D advection–diffusion simulator with PM2.5 and PM10, five kinds of dust source and buildings that block dust, and checked it against the Gaussian plume equation, the textbook model behind standard dispersion tools: within 1% on the centreline and 2% in plume width.</p>`,m:['With a diagonal wind the plume comes out 35% too wide, reported as a known limitation.']},
+   {t:'Of hotspots over time and the report',d:'',body:`<p class="drop">Across repeat inspections each point is marked new, recurring, reduced or clear, and every inspection produces a printable report.</p><div class="pair">${shot('assets/media/dust_hotspots.jpg','Plate VII. Hotspot history.')}${shot('assets/media/dust_report.jpg','Plate VIII. The inspection report.')}</div>`,m:[]}
+  ]},
+
+ wheel:{pn:'RV1, RV2  SIM RIG',title:'The wheel & the pedal',sub:'A 3D printed driving rig that connects as a Bluetooth gamepad',status:'Working, finished 27 October 2026',
+  spec:[['Controller','ESP32, Bluetooth gamepad'],['Sensing','Linear potentiometers turned through printed gears'],['Steering','2:1 gearing, ±45° at the wheel, about 2,400 ADC steps'],['Pedal','6:1 sector gear, 12° of travel, about 1,000 ADC steps'],['CAD','Parametric OpenSCAD, all parts print without supports'],['Revisions','Four, across three sensing methods']],
+  folios:[
+   {t:'Of the finished rig',d:'Rev C',body:`<p class="drop">The final design reads two real potentiometers. Each is driven through gears so that it turns far enough for a clean reading: the wheel’s ±45° becomes ±90° at the potentiometer, and the pedal’s 12° becomes 72°.</p><div class="pair">${img('assets/media/cad/wheel_hero.jpg','Plate II. The steering assembly, rendered from the CAD.')}${img('assets/media/cad/pedal_hero.jpg','Plate III. The pedal assembly.')}</div><div class="pair">${vid('assets/media/cad/wheel_turn.mp4','The wheel turning its 2:1 gear pair.',true)}${vid('assets/media/cad/pedal_press.mp4','The pedal driving its 6:1 sector gear.',true)}</div>`,m:['<span class="k">Steering</span>B2K potentiometer, 32:16 gears.','<span class="k">Pedal</span>B5K potentiometer, 96-tooth sector on a 16-tooth pinion.']},
+   {t:'On the desk',d:'27 Oct 2026',body:`<p class="drop">The finished rig, printed in grey PLA and wired to an ESP32 on a breadboard, driving a car in a racing game. Turning the wheel steers through the 2:1 gears, and the pedal on the right works the throttle.</p>${vid('assets/media/wheel_drive.mp4','The wheel and pedal in use, steering and accelerating in game.')}<div class="pair">${img('assets/media/wheel_real_1.jpg','Plate IV. Steering into a bend.')}${img('assets/media/wheel_real_3.jpg','Plate V. The ESP32 and breadboard beside the wheel.')}</div>${img('assets/media/wheel_real_2.jpg','Plate VI. The printed wheel, gears and centring spring.')}`,m:['Stills are upscaled from the phone video.']},
+   {t:'Of the first trigger: foil and capacitance',d:'Rev 0',body:`<p class="drop">The first version was a finger trigger. A grounded foil plate in the slider moved over a fixed foil plate, and the ESP32 read the change in capacitance as the overlap grew. Printed plastic 1.2 mm thick kept the plates from touching.</p>${img('assets/media/wheel_foil.png','Plate VII. How the foil trigger senses.')}<p>It worked, but the signal was small and noisy, and the foil joints kept coming loose.</p>`,m:['The first print locked up: 0.3 mm of clearance was too tight. 0.7 mm slid freely.']},
+   {t:'Rev A: pencil graphite',d:'v1',body:`<p class="drop">Next came a resistive track drawn in pencil graphite, with a wiper riding on it like a home-made potentiometer. HB graphite measured around 500 kΩ, so the reading was easily disturbed, and the taped joints kept failing.</p>`,m:['A 0.1 µF capacitor on the input was needed just to steady the reading.']},
+   {t:'Rev B: no foil, no tape',d:'v2',body:`<p class="drop">A redesign from scratch fixed each problem from v1: looser clearances with chamfers so shafts fit, crush ribs so the steering has no play, jumper pins instead of tape, and a single printed leaf spring in place of zig-zag springs that bound up. The graphite itself remained the weak point, which led to Rev C.</p>`,m:[]},
+   {t:'Of assembly',d:'',body:`<p class="drop">Each version was planned as a sequence of steps, with every part’s path into the assembly checked so that it could really be built in that order.</p><div class="pair">${img('assets/media/wheel_steering.png','Plate VIII. Steering, final step.')}${img('assets/media/wheel_pedal.png','Plate IX. Pedal, final step.')}</div>${vid('assets/media/wheel_steering.mp4','The steering assembly, step by step.')}${vid('assets/media/wheel_pedal.mp4','The pedal assembly.')}`,m:[]},
+  ]},
+
+ chemecar:{pn:'U4, M1  CHEM-E CAR',title:'ChemE Car',sub:'AIChE ChemE Car Competition, Qatar University team',status:'In progress',
+  spec:[['Organisers','American Institute of Chemical Engineers (AIChE) and Qatar University'],['My role','Electrical engineer: control electronics'],['Controller','Microcontroller driving an H-bridge'],['Braking','Dynamic braking by shorting the motor terminals'],['Goal','Stop as close as possible to a target distance']],
+  folios:[
+   {t:'Of the task',d:'',body:`<p class="drop">In the ChemE Car competition, the car is powered by chemistry and stopped by chemistry, and the team that stops closest to the target distance wins. My part is the electrical side: a microcontroller drives the motor and watches the reaction that decides when it stops.</p>`,m:[]},
+   {t:'Of the design',d:'',body:`<p class="drop">The car runs on a pack of twelve aluminium–air cells in series. Its stop is an iodine clock: two solutions are mixed at the start line, and after a set time the mixture turns suddenly dark. An LED and a light-dependent resistor watch the vessel; when the light drops below a threshold, an Arduino cuts the motor through a relay. The whole car has to fit in a 400 × 300 × 200 mm box and carry a 500 mL water payload.</p><figure><div class="plate"><iframe class="model" src="chemecar-3d.html" title="Interactive 3D build model of the ChemE car" loading="lazy"></iframe></div><figcaption>Fig. 1. The 3D build model. Drag to orbit, click a part to see how it is fixed, and pull the start lever to simulate a run.</figcaption></figure>`,m:['<span class="k">Clock</span>the reaction time sets the distance, so it is tuned before each run.','The 5 V electronics are kept on a separate pack from the aluminium–air cells.']},
+   {t:'Of stopping sharply',d:'',body:`<p class="drop">A coasting motor keeps turning after the power is cut, which spoils the stopping distance. At the stop signal, the controller closes both low-side switches of the H-bridge and shorts the motor. Its own back-EMF then drives a current that resists the rotation, and the car halts sharply. Try the three modes below.</p><div data-widget="hbridge"></div><figure>${FIG.brakeSpeed}<figcaption>Fig. 2. An illustration of why it matters: braking stops the motor far sooner than coasting.</figcaption></figure>`,m:['This is dynamic braking: the energy turns into heat rather than going back to the battery.','On the DRV8833, setting both inputs high selects brake mode.']}
+  ]},
+
+ cpu:{pn:'U2  OVERTURE-8',title:'An 8-bit computer',sub:'Designed from NAND gates upward in a gate-level digital logic simulator',status:'Overture complete. The LEG architecture is next.',
+  spec:[['Word size','8 bits'],['Registers','Six general-purpose, plus input and output'],['ALU','Add, subtract, AND, OR, NAND, NOR'],['Instruction classes','Immediate, calculate, copy, conditional jump'],['Built from','NAND gates, latches and flip-flops']],
+  folios:[
+   {t:'Run it',d:'',body:`<p class="drop">This is an instruction-accurate model of the machine, running a program I wrote for it: Fibonacci numbers, until the next sum no longer fits in 8 signed bits. Step through it, or let it run.</p><div data-widget="cpu"></div>`,m:['<span class="k">reg 3</span>receives every ALU result, and conditions are tested on it.','Jumps go to the address held in reg 0.']},
+   {t:'Of the gates',d:'',body:`<p class="drop">Everything starts from a single NAND gate. From it I built NOT, AND, OR and XOR, then multiplexers and decoders, then half and full adders, an 8-bit adder, and finally memory from latches and flip-flops.</p><p>Each component is checked against every input combination before it can be used in the next, so a mistake at the bottom cannot hide.</p>`,m:[]},
+   {t:'Of the datapath',d:'',body:`<p class="drop">The finished computer has a program counter feeding program memory, a decoder that reads each instruction byte, six registers, an 8-bit ALU, a condition unit for jumps, and input and output ports.</p>`,m:[]},
+   {t:'Of the decoder',d:'',body:`<p class="drop">The top two bits of each instruction choose its class: 00 loads a 6-bit value into reg 0, 01 runs the ALU on reg 1 and reg 2, 10 copies between registers and ports, and 11 tests reg 3 against one of eight conditions and jumps.</p>`,m:['The program above uses all four classes.']},
+  ]},
+
+ sensebridge:{pn:'MK1  SENSEBRIDGE',title:'Sensebridge',sub:'Recognising speech sounds to support children’s speech therapy',status:'Best Research Project Award, Track 3',
+  spec:[['Programme','QU Summer Research Internship, 2026'],['Sounds','/s/, /m/ and /p/'],['Model','CNN on audio spectrograms, transfer learning in TensorFlow'],['Data','Recordings from about 10 children'],['Accuracy','70% (±2%)']],
+  folios:[
+   {t:'Of the work',d:'Summer 2026',body:`<p class="drop">Speech therapy for children means many sessions practising the same sounds. We built a lightweight classifier that recognises the /s/, /m/ and /p/ phonemes, small enough to run later inside a mobile app and a custom circuit.</p><figure>${FIG.pipeline}<figcaption>Fig. 1. An illustration of the pipeline from recording to recognised sound.</figcaption></figure><p>Each recording becomes a spectrogram, an image of how its frequencies change over time, and a convolutional network classifies it. Transfer learning let a small dataset from around ten children reach 70% (±2%) accuracy in testing.</p>`,m:['Team: a speech therapist, computer science students, and a mentor in electrical and environmental engineering.']},
+   {t:'Of the award',d:'',body:`<p class="drop">The project won the Best Research Project Award in Track 3 of Qatar University’s 2026 Summer Research Internship Program, after a final report and oral presentation.</p>${img('assets/media/sensebridge_award.jpg','Plate II. Receiving the Best Research Project Award with the Sensebridge team, 23 September 2026.','The Sensebridge team on stage receiving their award certificate at Qatar University')}`,m:[]}
+  ]},
+
+ glucose:{pn:'U5  PPG',title:'Glucose, without a needle',sub:'Non-invasive continuous blood glucose monitoring research',status:'2026 to present',
+  spec:[['Supervisor','Dr. Muhammad E. H. Chowdhury, Qatar University'],['My part','Hardware prototyping and optical sensor integration'],['Signal','Photoplethysmography (PPG)']],
+  folios:[
+   {t:'Of the signal',d:'',body:`<p class="drop">A PPG sensor shines light into the skin and measures how much returns. Each heartbeat swells the blood vessels and changes that amount, producing a pulse waveform that carries information about the blood itself.</p><figure>${FIG.ppgSetup}<figcaption>Fig. 1. How a PPG sensor reads the pulse.</figcaption></figure><div data-widget="ppg"></div>`,m:[]},
+   {t:'Of my contribution',d:'',body:`<p class="drop">I contribute to the hardware prototype, integrating the optical sensors that capture the PPG signal. I also wrote a literature review covering how the analysis methods have evolved, multimodal sensor-fusion pipelines, the physics of the hardware, and clinical and regulatory benchmarks for non-invasive glucose estimation.</p>`,m:[]},
+   {t:'Of the group’s published work',d:'',body:`<p class="drop">The research builds on the lab’s earlier work under Dr. Chowdhury, which I studied for the literature review:</p><ol class="refs"><li><a href="http://hdl.handle.net/10576/56597">QU-GM: an IoT-based glucose monitoring system from photoplethysmography, blood pressure and demographic data using machine learning</a>, <i>IEEE Access</i>, 2024. A lightweight wristband captured PPG from 139 diabetic and non-diabetic subjects; the best model estimated blood glucose with a correlation of 0.90.</li><li>MMG-Net: a multimodal approach to estimate blood glucose using multi-stream and cross-modality attention, <i>Biomedical Signal Processing and Control</i> 92, 2024. It combines PPG, electrodermal activity, skin temperature and food logs, reaching a mean absolute error of 13.51 mg/dL with 99.43% of estimates in clinically acceptable ranges.</li></ol>`,m:['These papers are by the group, not by me; they are the starting point for the work I contribute to.']}
+  ]},
+
+ corrosion:{pn:'TP2  COUPON',title:'Coatings that report corrosion',sub:'Undergraduate Research Experience Program (UREP)',status:'2026 to present',
+  spec:[['Microspheres','CaCO₃, made by precipitation'],['Indicator','Phenolphthalein'],['Inhibitor','5-phenyl-1H-tetrazole'],['Coating','Polyurethane on carbon steel'],['Tests','Electrochemical and visual']],
+  folios:[
+   {t:'Of the idea',d:'',body:`<p class="drop">The coating carries microscopic capsules holding a corrosion indicator and an inhibitor. When the coating is damaged and the steel underneath starts to corrode, the local pH rises, the indicator turns pink to show where, and the inhibitor is released to slow the attack.</p><div data-widget="capsule"></div>`,m:['The weathered copper square on the board is a nod to this project.']},
+   {t:'Of the work',d:'',body:`<p class="drop">I synthesised the CaCO₃ microspheres, loaded them with indicator and inhibitor, cast them into polyurethane coatings, and tested the coated carbon steel electrochemically and visually, iterating the design with graduate supervisors.</p>`,m:[]}
+  ]},
+
+ syringe:{pn:'U8, J6  STEPPER',title:'The syringe rotator',sub:'Keeping multi-component samples mixed during long infusions',status:'Built and in use, 2026',
+  spec:[['Drive','NEMA 17 stepper, GT2 belt and pulleys'],['Controller','Arduino Uno R3'],['Mechanics','SolidWorks mount, 3D printed housing and pulley clamps'],['Cost','A fraction of commercial alternatives']],
+  folios:[
+   {t:'Of the problem and the fix',d:'',body:`<p class="drop">A graduate researcher’s samples separated into layers inside the syringe during long infusions, and nothing off the shelf solved it. I designed a rig that turns the syringe continuously about its own axis while the pump pushes the plunger, so the mixture never has time to settle.</p><figure>${FIG.syringe}<figcaption>Fig. 1. The rotation rig.</figcaption></figure><p>In use, it kept the fluid evenly mixed for the whole infusion.</p>${vid('assets/media/syringe_spin.mp4','The rig in use: the stepper turns the syringe through the GT2 belt while the pump infuses.',true)}<div class="pair">${img('assets/media/syringe_real_1.jpg','Plate II. The printed pulley clamp and belt on the syringe.')}${img('assets/media/syringe_real_2.jpg','Plate III. Mounted on the infusion pump.')}</div>`,m:[]}
+  ]},
+
+ irrigation:{pn:'J7, Q1  IRRIGATION',title:'Smart irrigation',sub:'An ESP32 that measures the soil and waters only when needed',
+  spec:[['Sensors','DS18B20 temperature, DHT22 humidity, capacitive soil moisture'],['Logging','Timed readings to an SD card'],['Actuator','Servo-driven valve']],
+  folios:[{t:'Of the study and the loop',d:'',body:`<p class="drop">First I logged conditions while growing plants at different moisture levels, to find the threshold at which they grew best. Then I closed the loop: the ESP32 opens a servo-driven valve whenever the soil drops below that threshold.</p><figure>${FIG.loop}<figcaption>Fig. 1. The control loop.</figcaption></figure><div data-widget="irrigation"></div>`,m:[]}]},
+
+ fpga:{pn:'DS1  FPGA',title:'A multiplier in VHDL',sub:'A 4-bit variable–constant multiplier on a DE10-Lite FPGA',status:'Digital Systems Design Lab coursework',
+  spec:[['Input','4-bit value A, from switches'],['Constant','K = 5'],['Output','A × K on two 7-segment displays'],['Tools','VHDL, Quartus Prime, ModelSim']],
+  folios:[
+   {t:'Of the design',d:'',body:`<p class="drop">The circuit multiplies a 4-bit input by 5 and shows the product, up to 75, on two seven-segment displays. The product is split into tens and units, and each digit goes through a decoder that drives the segments.</p>${shot('assets/media/fpga_block.png','Plate II. The synthesised design: multiply, split into digits, decode.')}<pre class="code">product     &lt;= TO_INTEGER(UNSIGNED(A)) * 5;
+tens_digit  &lt;= product / 10;
+units_digit &lt;= product MOD 10;
+HEX1 &lt;= digit_to_seg(tens_digit);
+HEX0 &lt;= digit_to_seg(units_digit);</pre>`,m:['The display on the board shows A = 3: 3 × 5 = 15.']},
+   {t:'Of the tests',d:'',body:`<p class="drop">A testbench drove every input from 0 to 15 and checked both display patterns against the expected product before the design went onto the board.</p>${shot('assets/media/fpga_waves.png','Plate III. All sixteen inputs in simulation, ending “Simulation completed successfully”.')}${vid('assets/media/fpga_board.mp4','The design running on the DE10-Lite.')}`,m:[]}
+  ]},
+
+ moribund:{pn:'U6  MORIBUND.ROM',title:'Moribund',sub:'A gothic isometric action RPG, built alone in Godot',status:'In development since October 2026',
+  spec:[['Engine','Godot 4, GDScript'],['Rendering','Dynamic torch shadows, fog, weather, post-processing shaders'],['Art pipeline','Blender renders 3D models into 16-direction sprites with normal maps'],['Content','27 monster types, 6 bosses, 2 classes, a branching quest']],
+  folios:[
+   {t:'Play it',d:'',body:`<p class="drop">A playable version of the first two areas, the village of Ashwick and the Weeping Graves, runs right here in the page. It was rebuilt for the browser with open-source art from the Flare project.</p><div data-widget="game"></div><p class="note">Source of the demo build and full asset credits: <a href="https://github.com/eng-adil/moribund-demo" style="color:var(--rubric)">github.com/eng-adil/moribund-demo</a>.</p>`,m:[]},
+   {t:'Of the world',d:'',body:`<p class="drop">A dying village, missing children, and a priest who prays too loudly. Every scene, map and interface is assembled in code. Enemies fight differently: telegraphed lunges, shield-bearers that must be struck from behind, archers that keep their distance, and bones that reassemble.</p>`,m:[]},
+   {t:'Of light and rendering',d:'',body:`<p class="drop">Torches cast line-of-sight shadows, fog and storms roll across the map, and custom shaders handle post-processing. Characters are rendered from 3D models in Blender into sprites for sixteen directions, with normal maps so that they respond to the game’s lights.</p>`,m:[]}
+  ]}
+};
+const roman=['i','ii','iii','iv','v','vi','vii','viii','ix','x'];
+function renderBook(p){
+  const B=BOOKS[p.book];
+  const hero=`<figure style="margin-top:4px"><div class="plate"><img src="assets/media/closeup_${p.id}.jpg" alt="Close-up render of ${p.ref} on the board"></div><figcaption>Plate I. ${p.ref}, on the board.</figcaption></figure>`;
+  const toc=['Summary',...B.folios.map(f=>f.t)];
+  book.innerHTML=`<div class="inner">
+   <nav class="rail" aria-label="Contents"><button class="back" type="button">Return to the board</button><h2>Contents</h2><ol>${toc.map((t,i)=>`<li><a href="#f${i}" data-i="${i}"><span class="n">${i?roman[i-1]:'&para;'}</span><span>${t}</span></a></li>`).join('')}</ol></nav>
+   <div class="pages">
+    <article class="folio" id="f0">
+      <div class="title"><div class="pn">${B.pn}</div><h1>${B.title}</h1><p>${B.sub}</p>${B.status?`<span class="status">${B.status}</span>`:''}</div>
+      <div class="body">${hero}<table class="spec">${B.spec.map(r=>`<tr><th>${r[0]}</th><td>${r[1]}</td></tr>`).join('')}</table></div>
+      <aside class="margin"><div>${p.val}</div></aside>
+    </article>
+    ${B.folios.map((f,i)=>`<article class="folio" id="f${i+1}"><div class="fhead"><h3>${f.t}</h3><span>folio ${roman[i]}${f.d?', '+f.d:''}</span></div><div class="body">${f.body}</div><aside class="margin">${f.m.map(x=>`<div>${x}</div>`).join('')}</aside></article>`).join('')}
+    <div class="ornament" aria-hidden="true">&#10086;</div>
+   </div></div>`;
+  book.querySelector('.back').addEventListener('click',closeBook);
+  book.querySelectorAll('[data-widget]').forEach(el=>{const stop=WIDGETS[el.dataset.widget](el);if(typeof stop==='function')cleanup.push(stop)});
+  const links=[...book.querySelectorAll('.rail a')];
+  links.forEach(a=>a.addEventListener('click',e=>{e.preventDefault();book.querySelector('#f'+a.dataset.i).scrollIntoView({behavior:reduce?'auto':'smooth'})}));
+  const io=new IntersectionObserver(es=>{es.forEach(en=>{if(en.isIntersecting){const i=en.target.id.slice(1);links.forEach(a=>a.classList.toggle('on',a.dataset.i===i))}})},{root:book,rootMargin:'-30% 0px -60% 0px'});
+  book.querySelectorAll('.folio').forEach(f=>io.observe(f));
+  links[0].classList.add('on');
+}
+
+fetch('assets/board.json').then(r=>r.json()).then(d=>{DATA=d;build()}).catch(()=>toast('The board data could not be loaded. Reload the page to try again.'));
+</script>
+
+</body>
+</html>

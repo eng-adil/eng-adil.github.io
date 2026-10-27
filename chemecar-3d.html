@@ -1,0 +1,143 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Chem-E-Car 3D build model</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef1f4;--pn:#fff;--fg:#17202a;--mu:#5b6775;--ln:#cfd6de;--ac:#4a3fd1;--ok:#13795b;--bad:#c0392b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#12161b;--pn:#1b2128;--fg:#e6ebf0;--mu:#9aa6b2;--ln:#303a45;--ac:#8f86ff;--ok:#4cc9a0;--bad:#ff7a6b}}
+:root[data-theme=dark]{--bg:#12161b;--pn:#1b2128;--fg:#e6ebf0;--mu:#9aa6b2;--ln:#303a45;--ac:#8f86ff;--ok:#4cc9a0;--bad:#ff7a6b}
+html,body{height:100%;margin:0}body{background:var(--bg);color:var(--fg);font:14px/1.45 "IBM Plex Sans",system-ui,sans-serif;display:flex;flex-direction:column}
+header{padding:8px 14px;border-bottom:1px solid var(--ln);display:flex;gap:14px;align-items:baseline;flex-wrap:wrap}h1{font-size:16px;margin:0}
+#app{flex:1;display:flex;min-height:0}aside{width:236px;overflow:auto;border-right:1px solid var(--ln);padding:6px 10px;background:var(--pn)}
+h2{font-size:12px;color:var(--mu);margin:12px 0 4px;font-weight:600}.row{display:flex;gap:6px;align-items:center}
+.row button{flex:1;text-align:left;border:0;background:none;color:var(--fg);padding:4px 6px;border-radius:4px;font:inherit;cursor:pointer}.row button:hover{background:var(--bg)}.row.on button{background:var(--ac);color:#fff}
+#vp{flex:1;display:flex;flex-direction:column;min-width:0}#tb{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:6px 14px;border-bottom:1px solid var(--ln);background:var(--pn)}
+button.b{border:1px solid var(--ln);background:var(--pn);color:var(--fg);border-radius:5px;padding:3px 10px;font:inherit;cursor:pointer}button.b:hover{border-color:var(--ac)}button.b.pri{background:var(--ac);border-color:var(--ac);color:#fff}
+#cv{flex:1;position:relative;min-height:260px}#cv canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#bot{display:flex;flex-wrap:wrap;gap:8px 28px;padding:8px 14px;max-height:38vh;overflow:auto;border-top:1px solid var(--ln);background:var(--pn)}#bot>div{flex:1 1 300px}
+#fit.ok{color:var(--ok)}#fit.bad{color:var(--bad)}.mu{color:var(--mu)}h3{margin:0 0 2px;font-size:14px}.sw{display:inline-block;width:10px;height:10px;margin-right:5px;border-radius:2px}
+input[type=range]{vertical-align:middle;width:110px}:focus-visible{outline:2px solid var(--ac);outline-offset:1px}
+@media(max-width:760px){#app{flex-direction:column}aside{width:auto;max-height:28vh;border-right:0;border-bottom:1px solid var(--ln)}}
+</style></head><body>
+<header><h1>Chem-E-Car 3D build model</h1><span class="mu">Aluminium–air + iodine-clock optical stop · all dimensions in mm</span><b id="fit"></b></header>
+<div id="app"><aside id="side" aria-label="Parts"></aside>
+<main id="vp"><div id="tb">
+<span><button class="b" data-v="Iso">Iso</button> <button class="b" data-v="Top">Top</button> <button class="b" data-v="Side">Side</button> <button class="b" data-v="Front">Front</button> <button class="b" data-v="Under">Under</button></span>
+<label>Explode <input id="ex" type="range" min="0" max="100" value="0"></label>
+<label>Build step <input id="st" type="range" min="0" max="10" value="10"> <b id="sn"></b></label>
+<label><input id="wr" type="checkbox"> Wires</label><label><input id="sb" type="checkbox" checked> Shoebox 400×300×200</label></div>
+<div id="cv"></div>
+<div id="bot"><div id="card"><h3>Click any part</h3><span class="mu">Click the car or a name on the left to zoom in and see how it is fixed in place. Drag to orbit, scroll to zoom, right-drag to pan.</span></div>
+<div><h3>Start and stop simulation</h3><button class="b pri" id="go">Pull start lever</button> <button class="b" id="rs">Reset</button>
+<label>Clock time T <input id="tt" type="range" min="38" max="85" value="55"> <b id="tv"></b> s</label>
+<select id="sx" aria-label="Sim speed"><option value="1">1×</option><option value="10" selected>10×</option><option value="30">30×</option></select>
+<div id="hl" class="mu"></div><div id="lg" class="mu" style="margin-top:6px"></div></div></div></main></div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/STLExporter.js"></script>
+<script>
+const T=THREE,$=s=>document.querySelector(s);let NP=0;
+const R=new T.WebGLRenderer({antialias:true,alpha:true});R.setPixelRatio(Math.min(devicePixelRatio,2));$('#cv').appendChild(R.domElement);
+const S=new T.Scene(),cam=new T.PerspectiveCamera(40,1,5,6000),ctl=new T.OrbitControls(cam,R.domElement);ctl.enableDamping=true;
+S.add(new T.HemisphereLight(0xffffff,0x6c7a89,.95));const dlt=new T.DirectionalLight(0xffffff,.8);dlt.position.set(250,450,300);S.add(dlt);
+const grid=new T.GridHelper(2400,24,0x8a96a3,0xaab4be);grid.position.y=-1;S.add(grid);
+const box=new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(400,200,300)),new T.LineBasicMaterial({color:0xe0533d}));box.position.set(0,100,0);S.add(box);
+const mat=(c,o=1)=>new T.MeshStandardMaterial({color:c,roughness:.55,metalness:.15,transparent:o<1,opacity:o});
+const M=(g,c,x,y,z,r,o)=>{const m=new T.Mesh(g,mat(c,o));m.position.set(x,y,z);if(r)m.rotation.set(...r);m.userData.np=NP;return m};
+const CG=(r,h)=>new T.CylinderGeometry(r,r,h,28),B=(w,h,d,c,x,y,z,o)=>M(new T.BoxGeometry(w,h,d),c,x,y,z,0,o),
+Cz=(r,h,c,x,y,z,o)=>M(CG(r,h),c,x,y,z,[Math.PI/2,0,0],o),Cx=(r,h,c,x,y,z,o)=>M(CG(r,h),c,x,y,z,[0,0,Math.PI/2],o),Cy=(r,h,c,x,y,z,o)=>M(CG(r,h),c,x,y,z,0,o);
+const tray=(cx,cz,w,d,h,y,c,o)=>[B(w,2,d,c,cx,y+1,cz,o),B(w,h-2,2,c,cx,y+h/2+1,cz+d/2-1,o),B(w,h-2,2,c,cx,y+h/2+1,cz-d/2+1,o),B(2,h-2,d-4,c,cx+w/2-1,y+h/2+1,cz,o),B(2,h-2,d-4,c,cx-w/2+1,y+h/2+1,cz,o)];
+const car=new T.Group();S.add(car);const parts=[];
+function P(id,name,grp,step,ex,dim,pr,fix,items){const g=new T.Group();items.flat(Infinity).forEach(i=>i&&g.add(i));g.traverse(m=>{if(m.isMesh){m.userData.p=id;m.userData.o=m.material.opacity}});parts.push({id,name,grp,step,ex,dim,pr,fix,g,on:true});car.add(g);NP=0}
+const ci=k=>{const a=k<6,x=a?50+20*k:150-20*(k-6),z0=a?-57:57,d=a?1:-1,s=k%2?-1:1;return{x,z0,mz:z0+d*30*s,pz:z0-d*30*s}};
+function rack(a,b){const o=[];for(let k=a;k<b;k++){const{x,z0}=ci(k);o.push(B(12,5,110,'#5b6b7c',x,66+2.5,z0),B(12,5,110,'#5b6b7c',x,176-2.5,z0),B(12,100,5,'#5b6b7c',x,121,z0-52.5),B(12,100,5,'#5b6b7c',x,121,z0+52.5))}NP=1;
+ for(let k=a;k<b;k++){const{x,z0,mz,pz}=ci(k);o.push(B(14,98,98,'#0e1318',x,121,z0),B(4,8,14,'#cdd3da',x,180,mz),B(4,8,14,'#dc2626',x,180,pz))}return o}
+const wheels=[],WH=[];for(const x of[-130,120])for(const s of[1,-1]){const w=new T.Group();w.position.set(x,35,s*127);w.add(Cz(35,16,'#262b33',0,0,0),Cz(20,17,'#8b95a1',0,0,0),B(60,5,17.5,'#cbd5e1',0,0,0));wheels.push(w);WH.push(w,Cz(5.5,4,'#d7dde3',x,35,s*117))}
+const lever=new T.Group();lever.position.set(-35,143,55);lever.add(B(8,4,46,'#dc2626',0,0,23),M(new T.SphereGeometry(5,14,10),'#dc2626',0,0,48));
+const L=B(18,1,52,'#dbeafe',-35,79.5,55,.85),Lb=M(CG(16.5,1),'#fcd34d',-35,170,55,0,.85),spin=new T.Group();spin.position.set(-35,80.5,55);spin.add(Cz(2,10,'#fff',0,0,0));
+const setL=h=>{L.scale.y=h;L.position.y=79+h/2},setLb=f=>{Lb.scale.y=Math.max(.001,26*f);Lb.position.y=156+13*f};
+[L,Lb].forEach(m=>m.userData.np=1);spin.children.forEach(m=>m.userData.np=1);
+const PR=true,BL='#5b7cfa',G='#aab4c0',SL='#d7dde3';
+P('chassis','Chassis plate','Frame and wheels',1,[0,0,0],'350 × 230 × 4 mm',PR,'Cut from 4 mm acrylic or PETG sheet. Drill M3 holes for blocks, saddle, trays and enclosure, plus two slots for the motor so you can tension the belt. Too large for most printer beds: print in 2–4 tiles joined by splice plates, or cut sheet.',[B(350,4,230,G,0,52,0)]);
+P('bearings','Bearing blocks ×4','Frame and wheels',2,[0,-45,0],'22 × 26 × 14 mm each',PR,'Press a 626 bearing into each block. Bolt the blocks under the plate with M3 screws at the axle positions, then check the axle turns freely with no wobble.',[[[-130,100],[-130,-100],[120,100],[120,-100]].map(([x,z])=>[B(22,26,14,BL,x,36,z),Cz(9.5,15,SL,x,35,z)])]);
+P('axles','Axles ×2','Frame and wheels',2,[0,-80,0],'6 mm rod, 270 mm long',0,'Slide each rod through its two bearings. Fit a shaft collar just outside each bearing so the axle cannot slide sideways. Rear axle is driven; front axle spins freely.',[Cz(3,270,SL,-130,35,0),Cz(3,270,SL,120,35,0)]);
+P('wheels','Wheels and collars ×4','Frame and wheels',3,[0,-120,0],'Ø70 × 16 mm',0,'Rear wheels clamp to the driven axle with hub set screws. Front wheels turn freely on the front axle. All four must have the same diameter for straight tracking.',[WH]);
+P('motor','Gearmotor (Pololu 3253)','Drive',4,[0,-60,-40],'25D × 52L mm, 12 V',0,'Shaft points toward +Z. Two M3 screws into the faceplate, no deeper than 6 mm. Sits parallel to the rear axle, 80 mm ahead of it.',[Cz(12.5,30,'#4b5563',-50,35,-35),Cz(12.5,22,'#c0c7cf',-50,35,-9),Cz(2,12.5,'#e5e7eb',-50,35,8.25)]);
+P('saddle','Motor saddle','Drive',4,[0,-30,-40],'34 × 3 × 40 mm',PR,'Clamps the motor to the plate through the slots. Loosen both screws and slide it to set belt tension, then re-tighten.',[B(34,3,40,BL,-50,49,-12)]);
+P('pulleys','Pulleys and belt','Drive',4,[0,-90,40],'2× 20T GT2, 200 mm belt',0,'One pulley on the 4 mm motor shaft, one on the 6 mm rear axle. Line up the pulley faces, tension lightly, and fit a guard so nothing can catch the belt.',[Cz(7,8,'#e8b04a',-50,35,10),Cz(7,8,'#e8b04a',-130,35,10),B(80,1.2,7,'#111',-90,42.2,10),B(80,1.2,7,'#111',-90,27.8,10)]);
+P('box','Electronics enclosure','Electronics',5,[-50,60,0],'90 × 56 × 120 mm',PR,'Bolt to the rear of the plate, above any splash path. Add cable glands for the sensor, relay and RUN wires. Print a snap-on lid.',[tray(-130,0,90,120,56,54,'#9fb3c8',.3),B(84,2,114,'#9fb3c8',-130,76,0,.3)]);
+P('elec','Arduino, relay, 5 V pack','Electronics',5,[-50,130,0],'Uno + relay module + USB pack',0,'Uno on standoffs, relay module beside it (COM and NO into the motor circuit), 5 V instrumentation pack on the shelf. Never connect the Al–air pack to any of these.',[B(53,3,68,'#0f766e',-142,60,0),B(26,19,50,'#2563eb',-100,64,0),B(60,12,24,'#374151',-130,83,0)]);
+P('s1','Fuse and emergency switch','Electronics',5,[-50,190,0],'1.25 A fuse, DC switch',0,'Fuse and switch sit in the + line ahead of the relay COM terminal. Mount them where you can reach them without crossing the car.',[B(24,6,24,'#222',-110,113,35),Cy(10,8,'#dc2626',-110,120,35),B(30,8,12,'#d4a017',-150,114,35)]);
+P('trays','Containment trays','Power',6,[0,25,0],'130×116×12 (cells), 70×100×10 (clock)',PR,'Catch spills under both cell racks and the clock vessel. Print in a material proven compatible with your electrolyte (PP or HDPE per your guide); do not assume PLA or resin is.',[tray(100,-57,130,116,12,54,'#2bb3a3',.5),tray(100,57,130,116,12,54,'#2bb3a3',.5),tray(-35,55,70,100,10,54,'#2bb3a3',.5)]);
+P('rackA','Cell rack A (C1–C6)','Power',7,[0,60,-50],'6 cells, 110 × 110 × 12, pitch 20',PR,'Frames print; aluminium, separator and air cathode are cut or bought. Keep the 6 mm air gap between cells open. Tabs alternate sides so the + of one cell meets the − of the next.',[rack(0,6)]);
+P('rackB','Cell rack B (C7–C12)','Power',7,[0,60,50],'6 cells, 110 × 110 × 12, pitch 20',PR,'Same as rack A. C6+ jumps across to C7−. Pack + and − both come out in the middle channel at x = 50.',[rack(6,12)]);
+P('cradle','Tank cradle and strap','Payload',8,[0,15,-45],'96 × 96 × 6 mm',PR,'Keeps the water low and near the middle for rear-wheel traction. The strap holds the tank even if the car tips.',[B(96,6,96,BL,-35,57,-60),M(new T.TorusGeometry(43,2.2,8,40),'#111',-35,100,-60,[Math.PI/2,0,0])]);
+P('tank','Water payload (500 mL)','Payload',8,[0,70,-45],'Ø84 × 104 mm',0,'Lidded, leak-proof container, filled and sealed at the prep table. Confirm the payload volume for your event.',[Cy(42,104,'#60a5fa',-35,112,-60,.3),Cy(40,100,'#38bdf8',-35,112,-60,.65),Cy(44,4,'#9aa7b4',-35,166,-60)]);
+P('stir','Magnetic stirrer','Clock and start/stop',9,[0,25,0],'36 × 44 × 12 mm, 5 V',0,'Sits under the reactor on the 5 V instrumentation pack only. Fixed gentle speed. It must never influence driving distance.',[B(36,12,44,'#6b7280',-35,70,55)]);
+P('reactor','Reaction vessel','Clock and start/stop',9,[0,55,0],'22 × 56 × 58 mm, 40 mL',0,'Flat sides give an 18 mm light path. Holds solution A (20 mL) and a stir bar. Capped and sealed, with a headspace return tube to the reservoir.',[B(22,58,56,'#bfe3ff',-35,105,55,.25),B(24,4,58,'#9aa7b4',-35,136,55),L,spin]);
+P('optic','Optical housing, LED and LDR','Clock and start/stop',9,[0,90,40],'32 × 68 × 38 mm',PR,'Black housing holds the green LED and LDR on one axis, below the final liquid level and clear of the stir bar. It blocks room light and re-seats in the same position every time.',[tray(-35,55,32,68,38,76,'#0b0f14',.4),(NP=1,Cx(2.5,4,'#22c55e',-48,93,55)),Cx(4,2,'#f59e0b',-22,93,55),Cx(1.2,26,'#4ade80',-35,93,55,.5)]);
+P('res','Reservoir and stand','Clock and start/stop',9,[0,120,50],'Reservoir Ø36 × 30 mm (30 mL)',PR,'Reservoir sits above the reactor so solution B (20 mL) drains by gravity through the valve. Stand and arm print; reservoir is bought. Add a headspace return tube.',[B(8,90,8,BL,-35,109,102),B(8,4,52,BL,-35,152,76),(NP=1,M(CG(18,30),'#e5e7eb',-35,169,55,0,.4)),Lb]);
+P('valve','Start valve, lever, RUN switch','Clock and start/stop',9,[0,100,20],'Valve + lever 46 mm + microswitch',PR,'One lever opens the valve fully and presses the RUN microswitch. The valve must empty the reservoir in about 2 s. No syringes at the start line; built-in valves only.',[lever,(NP=1,B(14,10,14,'#9aa7b4',-35,143,55)),Cy(2.5,6,'#9aa7b4',-35,151,55),B(10,8,16,'#111',-35,128,96)]);
+const part=id=>parts.find(p=>p.id==id);
+// wires
+const wg=new T.Group();S.add(wg);const tm=k=>[ci(k).x,180,ci(k).mz],tp=k=>[ci(k).x,180,ci(k).pz],WI=[];
+for(let k=0;k<11;k++){const a=tp(k),b=tm(k+1);WI.push(['#f59e0b',[a,[a[0],187,a[2]],[b[0],187,b[2]],b]])}
+WI.push(['#6b7280',[tm(0),[30,180,-27],[30,58,-27],[12,58,-27],[12,58,-112],[-54,58,-112],[-54,40,-118],[-54,40,-52]]],
+['#ef4444',[tp(11),[30,180,27],[30,58,27],[12,58,27],[12,58,110],[-148,58,110],[-148,121,110],[-148,121,35],[-110,126,35],[-100,126,20],[-100,74,20]]],
+['#ef4444',[[-100,74,0],[-100,90,-62],[-88,56,-118],[-46,40,-118],[-46,40,-52]]],
+['#38bdf8',[[-48,93,55],[-60,70,62],[-60,62,40],[-110,62,20],[-130,62,12]]],
+['#22c55e',[[-142,62,-28],[-120,62,-30],[-100,66,-22]]],
+['#ec4899',[[-35,128,96],[-60,128,108],[-60,58,108],[-140,58,100],[-140,60,34]]],
+['#a855f7',[[-110,83,28],[-70,84,62],[-52,64,62],[-52,70,60]]]);
+WI.forEach(([c,p])=>{for(let i=0;i<p.length-1;i++){const a=new T.Vector3(...p[i]),d=new T.Vector3(...p[i+1]).sub(a),m=new T.Mesh(new T.CylinderGeometry(1.3,1.3,d.length(),6),new T.MeshBasicMaterial({color:c}));m.position.copy(a).addScaledVector(d,.5);m.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),d.normalize());wg.add(m)}});
+$('#lg').innerHTML=[['#ef4444','Propulsion +'],['#6b7280','Propulsion −'],['#f59e0b','Cell series jumpers'],['#38bdf8','LED/LDR signal'],['#22c55e','Relay control'],['#ec4899','RUN switch'],['#a855f7','Mixer 5 V']].map(([c,t])=>`<span style="margin-right:10px;white-space:nowrap"><i class="sw" style="background:${c}"></i>${t}</span>`).join('')+'<br>Wire routes are schematic, not final cut lengths.';
+// UI
+const SN=['Nothing','Chassis','Axles and bearings','Wheels','Drive train','Electronics','Trays','Cell racks','Payload','Clock and start/stop','Complete'];
+let sel=null,iso=false,goalT=null,goalP=null;const V0=new T.Vector3(0,90,0),VW={Iso:[330,260,430],Top:[0,650,1],Side:[0,110,650],Front:[650,110,0],Under:[150,-380,300]};
+cam.position.set(...VW.Iso);ctl.target.copy(V0);
+const view=n=>{goalT=V0.clone();goalP=new T.Vector3(...VW[n])};
+const gs=[...new Set(parts.map(p=>p.grp))];
+$('#side').innerHTML=gs.map(g=>`<h2>${g}</h2>`+parts.filter(p=>p.grp==g).map(p=>`<div class="row" id="r-${p.id}"><input type="checkbox" checked aria-label="Show ${p.name}" data-i="${p.id}"><button data-s="${p.id}">${p.name}</button></div>`).join('')).join('');
+function refresh(){const st=+$('#st').value,e=+$('#ex').value/100;$('#sn').textContent=SN[st];
+ parts.forEach(p=>{p.g.visible=p.on&&p.step<=st;p.g.position.set(p.ex[0]*e,p.ex[1]*e,p.ex[2]*e);p.g.traverse(m=>{if(m.isMesh){const dim=iso&&sel&&p!=sel;m.material.opacity=dim?m.userData.o*.1:m.userData.o;m.material.transparent=m.material.opacity<1;m.material.emissive.setHex(p==sel?0x3a3fd0:(st<10&&p.step==st?0x1c2a60:0))}})});
+ wg.visible=$('#wr').checked&&e<.02;box.visible=$('#sb').checked;
+ const b=new T.Box3();let n=0;parts.forEach(p=>{if(p.g.visible){b.expandByObject(p.g);n++}});const f=$('#fit');
+ if(e>.02||!n){f.textContent='Fit check: reset explode to measure';f.className='mu'}else{const s=b.getSize(new T.Vector3()),ok=s.x<=400&&s.z<=300&&s.y<=200;f.textContent=`Envelope ${s.x.toFixed(0)} × ${s.z.toFixed(0)} × ${s.y.toFixed(0)} mm (L × W × H) — ${ok?'fits':'exceeds'} the 400 × 300 × 200 box`;f.className=ok?'ok':'bad'}}
+function select(id){sel=id?part(id):null;document.querySelectorAll('.row').forEach(r=>r.classList.toggle('on',sel&&r.id=='r-'+sel.id));
+ if(!sel){$('#card').innerHTML='<h3>Click any part</h3>';refresh();return}
+ if(sel.step>+$('#st').value)$('#st').value=10;sel.on=true;$('#r-'+sel.id+' input').checked=true;refresh();
+ const bx=new T.Box3().setFromObject(sel.g),c=bx.getCenter(new T.Vector3()),d=cam.position.clone().sub(ctl.target).normalize();goalT=c;goalP=c.clone().add(d.multiplyScalar(Math.max(bx.getSize(new T.Vector3()).length()*1.6,130)));
+ $('#card').innerHTML=`<h3>${sel.name}</h3><div class="mu">${sel.grp} · build step ${sel.step} · ${sel.dim}</div><p style="margin:6px 0"><b>How to fix it:</b> ${sel.fix}</p><p class="mu" style="margin:4px 0">${sel.pr?'3D-print this part (PETG/PP). Anything marked bought in its note is not in the STL.':'Buy this part; not 3D printed.'}</p><button class="b" id="iso">${iso?'Show all parts':'Isolate'}</button> ${sel.pr?'<button class="b pri" id="dl1">Download STL (.zip)</button>':''}`}
+$('#side').onclick=e=>{const i=e.target.dataset;if(i.s)select(i.s);if(i.i){part(i.i).on=e.target.checked;refresh()}};
+$('#card').onclick=e=>{if(e.target.id=='iso'){iso=!iso;select(sel.id)}if(e.target.id=='dl1')dl([sel],sel.id+'-stl.zip')};
+document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>view(b.dataset.v));['ex','st','wr','sb'].forEach(i=>$('#'+i).oninput=refresh);
+let dn=null;R.domElement.onpointerdown=e=>dn=[e.clientX,e.clientY];
+R.domElement.onpointerup=e=>{if(!dn||Math.hypot(e.clientX-dn[0],e.clientY-dn[1])>4)return;const r=R.domElement.getBoundingClientRect(),ms=new T.Vector2((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1),rc=new T.Raycaster();rc.setFromCamera(ms,cam);
+ const h=rc.intersectObjects(parts.filter(p=>p.g.visible).map(p=>p.g),true).find(x=>x.object.userData.p&&x.object.material.opacity>.2);select(h?h.object.userData.p:null)};
+// STL zip
+const crcT=(()=>{const t=[];for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})(),crc=u=>{let c=-1;for(let i=0;i<u.length;i++)c=crcT[(c^u[i])&255]^(c>>>8);return(c^-1)>>>0};
+function zip(fs){const ch=[],cd=[],en=new TextEncoder(),w=(n,f)=>{const b=new DataView(new ArrayBuffer(n));f(b);return new Uint8Array(b.buffer)};let off=0;
+ fs.forEach(f=>{const n=en.encode(f.n),c=crc(f.d),s=f.d.length;ch.push(w(30,b=>{b.setUint32(0,0x04034b50,1);b.setUint16(4,20,1);b.setUint32(14,c,1);b.setUint32(18,s,1);b.setUint32(22,s,1);b.setUint16(26,n.length,1)}),n,f.d);
+ cd.push(w(46,b=>{b.setUint32(0,0x02014b50,1);b.setUint16(4,20,1);b.setUint16(6,20,1);b.setUint32(16,c,1);b.setUint32(20,s,1);b.setUint32(24,s,1);b.setUint16(28,n.length,1);b.setUint32(42,off,1)}),n);off+=30+n.length+s});
+ const cs=cd.reduce((a,x)=>a+x.length,0);return new Blob([...ch,...cd,w(22,b=>{b.setUint32(0,0x06054b50,1);b.setUint16(8,fs.length,1);b.setUint16(10,fs.length,1);b.setUint32(12,cs,1);b.setUint32(16,off,1)})])}
+async function dl(list,name){const hl=$('#hl');try{const D=window.claude?await claude.use('downloads'):null;if(!D){hl.textContent='Downloads need the published page view.';return}
+ const ex=new T.STLExporter(),fs=list.map(p=>{const s=new T.Scene(),c=p.g.clone(),rm=[];c.position.set(0,0,0);c.traverse(m=>{if(m.isMesh&&m.userData.np)rm.push(m)});rm.forEach(m=>m.parent.remove(m));s.add(c);s.updateMatrixWorld(true);const o=ex.parse(s,{binary:true});return{n:p.id+'.stl',d:o instanceof DataView?new Uint8Array(o.buffer):new TextEncoder().encode(o)}});
+ await D.save({filename:name,data:zip(fs)});hl.textContent='Saved. Millimetres, Y-up: lay each part flat in your slicer.'}catch(e){hl.textContent=e&&e.code=='declined'?'Download cancelled.':'Download unavailable here.'}}
+// simulation
+const VEL=.35,K=1.75,C1=new T.Color('#dbeafe'),C2=new T.Color('#17103a');let sim=null,gx=0;
+const pred=()=>(VEL*(+$('#tt').value+2.6)+.2).toFixed(1);
+function idle(){sim=null;lever.rotation.x=0;setL(25);L.material.color.set(C1);setLb(1);gx=0;grid.position.x=0;$('#go').disabled=false;$('#tv').textContent=$('#tt').value;$('#hl').textContent=`Ready. Predicted stop ≈ ${pred()} m, from ${VEL} m/s, ~2.6 s mixing and endpoint, and 0.20 m coast. These are illustrative values, not measurements of your car.`}
+$('#go').onclick=()=>{sim={t:0,d:0,cut:false};$('#go').disabled=true};$('#rs').onclick=idle;$('#tt').oninput=()=>{if(!sim)idle()};$('#tv').textContent=55;
+const clk=new T.Clock();
+function tick(dt){if(!sim||sim.end)return;const s=dt*$('#sx').value;sim.t+=s;const t=sim.t,T0=+$('#tt').value;
+ lever.rotation.x=.3*Math.min(1,t/.5);const f=Math.min(1,Math.max(0,(t-.3)/1.7));setLb(1-f);setL(25+25.5*f);
+ const sg=1/(1+Math.exp(-(t-2-T0)/1.2)),a0=Math.round(800-650*sg);L.material.color.lerpColors(C1,C2,sg);
+ if(!sim.cut&&a0<400){sim.cut=true;sim.tc=t}const v=sim.cut?VEL*Math.exp(-K*(t-sim.tc)):VEL;sim.d+=v*s;
+ wheels.forEach(w=>w.rotation.z-=v/.035*dt);gx=(gx-v*1000*dt)%100;grid.position.x=gx;
+ if(sim.cut&&v<.003){sim.end=true;$('#go').disabled=false}
+ $('#hl').innerHTML=`t = ${t.toFixed(1)} s · RUN switch closed · LDR reading A0 = ${a0} (stop below 400) · relay ${sim.cut?'<b>OPEN, motor off, coasting</b>':'closed, motor on'} · distance <b>${sim.d.toFixed(2)} m</b>${sim.end?'<br>Stopped. The clock endpoint cut power at '+(VEL*(sim.tc-0)).toFixed(1)+' m and the car coasted to '+sim.d.toFixed(1)+' m.':''}`}
+function resize(){const c=$('#cv');R.setSize(c.clientWidth,c.clientHeight,false);cam.aspect=c.clientWidth/c.clientHeight;cam.updateProjectionMatrix()}
+new ResizeObserver(resize).observe($('#cv'));
+(function loop(){requestAnimationFrame(loop);const dt=Math.min(clk.getDelta(),.05);tick(dt);spin.rotation.y+=dt*(sim&&!sim.end?20:0);
+ if(goalT){ctl.target.lerp(goalT,.12);cam.position.lerp(goalP,.12);if(cam.position.distanceTo(goalP)<1&&ctl.target.distanceTo(goalT)<1)goalT=null}ctl.update();R.render(S,cam)})();
+idle();refresh();resize();
+</script></body></html>
